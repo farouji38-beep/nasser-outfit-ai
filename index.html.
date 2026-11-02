@@ -1,1 +1,178 @@
 
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0911">
+<title>NASSER OUTFIT AI</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0911;color:#fff;font-family:Arial,sans-serif}
+header{padding:22px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #292333}
+.logo{font-size:19px;font-weight:900;letter-spacing:1px}
+.logo span{color:#bd82ff}
+.tag{font-size:10px;color:#c99aff;border:1px solid #61447e;padding:8px;border-radius:20px}
+main{max-width:850px;margin:auto;padding:24px 16px}
+h1{font-size:38px;margin:30px 0 10px;line-height:1.3}
+h1 span{color:#bd82ff}
+.sub{color:#aaa;font-size:14px;line-height:1.8}
+.card{background:#17131f;border:1px solid #30283a;border-radius:18px;padding:18px;margin:18px 0}
+h3{margin:5px 0 12px}
+small{color:#aaa}
+.upload{display:block;border:1px dashed #8c65b4;padding:22px;border-radius:14px;text-align:center;cursor:pointer;margin-top:12px}
+.upload input{display:none}
+.preview{display:none;width:100%;max-height:320px;object-fit:contain;margin-top:15px;border-radius:12px}
+button{width:100%;padding:16px;border:0;border-radius:13px;background:linear-gradient(100deg,#7540c7,#bd82ff);color:white;font-weight:bold;font-size:16px;cursor:pointer}
+button:disabled{opacity:.4}
+#status{text-align:center;color:#d1aaff;margin:15px}
+#result{display:none}
+#result img{width:100%;border-radius:15px}
+footer{text-align:center;color:#777;font-size:11px;padding:30px}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">NASSER <span>OUTFIT AI</span></div>
+ <div class="tag">AI FASHION</div>
+</header>
+
+<main>
+<h1>لبس الستايل ديالك<br><span>قبل ما تلبسو ✨</span></h1>
+<p class="sub">جرب الملابس ديالك افتراضياً بالذكاء الاصطناعي واكتشف ستايل جديد.</p>
+
+<div class="card">
+ <h3>01 — صورتك الشخصية</h3>
+ <small>اختار صورة واضحة ديالك والجسم باين فيها.</small>
+ <label class="upload">
+  📸 اضغط لاختيار صورتك
+  <input type="file" id="person" accept="image/*">
+  <img class="preview" id="personPreview">
+ </label>
+</div>
+
+<div class="card">
+ <h3>02 — صورة الملابس</h3>
+ <small>اختار تيشورت أو جاكيطة أو قطعة ملابس أخرى.</small>
+ <label class="upload">
+  👕 اضغط لاختيار الملابس
+  <input type="file" id="garment" accept="image/*">
+  <img class="preview" id="garmentPreview">
+ </label>
+</div>
+
+<div class="card">
+ <h3>03 — وصف اللوك (اختياري)</h3>
+ <input id="description" placeholder="مثلاً: Black oversized streetwear"
+ style="width:100%;padding:14px;border-radius:10px;background:#0b0911;color:white;border:1px solid #443650">
+</div>
+
+<button id="try" disabled>✨ جرّب اللوك ديالي</button>
+<div id="status"></div>
+
+<div class="card" id="result">
+ <h3>النتيجة ديالك 🎉</h3>
+ <img id="resultImage">
+ <button onclick="downloadResult()">تحميل الصورة</button>
+</div>
+</main>
+<footer>NASSER OUTFIT AI · YOUR STYLE, YOUR RULES</footer>
+
+<script type="module">
+import { client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
+
+const person=document.getElementById("person");
+const garment=document.getElementById("garment");
+const btn=document.getElementById("try");
+const status=document.getElementById("status");
+
+let outputUrl="";
+
+function preview(input,id){
+ input.addEventListener("change",()=>{
+  const f=input.files[0];
+  if(!f)return;
+  if(!f.type.startsWith("image/"))return alert("اختار صورة صحيحة");
+  if(f.size>12*1024*1024)return alert("الصورة كبيرة، الحد 12MB");
+  const img=document.getElementById(id);
+  img.src=URL.createObjectURL(f);
+  img.style.display="block";
+  btn.disabled=!(person.files[0]&&garment.files[0]);
+ });
+}
+
+preview(person,"personPreview");
+preview(garment,"garmentPreview");
+
+btn.onclick=async()=>{
+ btn.disabled=true;
+ status.textContent="كنوجدو اللوك ديالك...";
+
+ try{
+  const app=await client("yisol/IDM-VTON");
+
+  const human=await app.upload_files([person.files[0]]);
+  const clothes=await app.upload_files([garment.files[0]]);
+
+  const result=await app.predict("/tryon",[
+   {
+    background:human[0],
+    layers:[],
+    composite:null
+   },
+   clothes[0],
+   document.getElementById("description").value||"High quality fashion outfit",
+   true,
+   true,
+   30,
+   42
+  ]);
+
+  console.log(result.data);
+
+  const data=result.data;
+  const findImage=(obj)=>{
+   if(!obj)return null;
+   if(typeof obj==="string"&&/^https?:|^data:image/.test(obj))return obj;
+   if(Array.isArray(obj)){
+    for(const x of obj){const r=findImage(x);if(r)return r;}
+   }
+   if(typeof obj==="object"){
+    if(obj.url)return obj.url;
+    if(obj.path)return obj.path;
+    for(const k in obj){const r=findImage(obj[k]);if(r)return r;}
+   }
+   return null;
+  };
+
+  outputUrl=findImage(data);
+  if(!outputUrl)throw new Error("ما قدرناش نلقاو صورة النتيجة");
+
+  document.getElementById("resultImage").src=outputUrl;
+  document.getElementById("result").style.display="block";
+  status.textContent="اللوك الجديد واجد! 🎉";
+
+ }catch(e){
+  console.error(e);
+  status.textContent="وقع مشكل: "+e.message;
+ }finally{
+  btn.disabled=!(person.files[0]&&garment.files[0]);
+ }
+};
+
+window.downloadResult=async()=>{
+ if(!outputUrl)return;
+ try{
+  const r=await fetch(outputUrl);
+  const b=await r.blob();
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(b);
+  a.download="NASSER-OUTFIT.jpg";
+  a.click();
+  URL.revokeObjectURL(a.href);
+ }catch(e){window.open(outputUrl,"_blank")}
+};
+</script>
+</body>
+</html>
